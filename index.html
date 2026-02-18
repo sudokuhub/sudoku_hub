@@ -128,6 +128,33 @@
   .note-n { font-size:clamp(7px,1.5vw,10px); color:var(--muted); display:flex; align-items:center; justify-content:center; font-weight:700; line-height:1; }
   .note-n.on { color:var(--accent3); }
 
+
+  /* ── PAUSE ── */
+  .pause-btn {
+    width: 100%; padding: 12px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); font-family: "Space Mono", monospace;
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .pause-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .pause-btn.paused { color: var(--accent); border-color: var(--accent); background: rgba(232,255,71,.06); }
+
+  /* Pause overlay on grid */
+  .grid-wrap { position: relative; margin-bottom: 12px; }
+  .pause-mask {
+    display: none; position: absolute; inset: 0;
+    background: var(--bg);
+    z-index: 10; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    border: 2px solid var(--accent);
+  }
+  .pause-mask.show { display: flex; }
+  .pause-mask-icon { font-size: 48px; }
+  .pause-mask-txt { font-family: "Bebas Neue", sans-serif; font-size: 36px; letter-spacing: 6px; color: var(--accent); }
+  .pause-mask-sub  { font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
   /* ── NUMPAD ── */
   .numpad { display:grid; grid-template-columns:repeat(9,1fr); gap:5px; margin-bottom:12px; }
   .num-btn {
@@ -232,7 +259,14 @@
     <div class="progress-fill" id="prog" style="width:0%"></div>
   </div>
 
-  <div class="grid" id="grid"></div>
+  <div class="grid-wrap">
+    <div class="grid" id="grid"></div>
+    <div class="pause-mask" id="pauseMask">
+      <div class="pause-mask-icon">⏸</div>
+      <div class="pause-mask-txt">Paused</div>
+      <div class="pause-mask-sub">Click Resume to continue</div>
+    </div>
+  </div>
   <div class="numpad" id="numpad"></div>
 
   <div class="actions">
@@ -241,6 +275,7 @@
     <button class="act-btn" id="hintBtn" onclick="hint()"><span>💡</span>Hint (3)</button>
   </div>
 
+  <button class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸ &nbsp;Pause</button>
   <button class="new-btn" onclick="newGame()">⟳ New Game</button>
 </div>
 
@@ -376,6 +411,7 @@ let gameOver   = false;
 let timerID    = null;
 let adBannerHidden = false;
 let hintsLeft  = 3;
+let paused     = false;
 
 // ════════════════════════════════════════════════
 //  NEW GAME  ← called at init and by button
@@ -389,6 +425,13 @@ function newGame() {
   selected  = null;
   noteMode  = false;
   hintsLeft = 3;
+  paused    = false;
+  const pauseBtn = document.getElementById('pauseBtn');
+  if(pauseBtn){ pauseBtn.classList.remove('paused'); pauseBtn.innerHTML='⏸ &nbsp;Pause'; }
+  const pauseMask = document.getElementById('pauseMask');
+  if(pauseMask) pauseMask.classList.remove('show');
+  const np2 = document.getElementById('numpad');
+  if(np2){ np2.style.pointerEvents=''; np2.style.opacity=''; }
   document.getElementById('noteBtn').classList.remove('on');
   document.getElementById('score').textContent = '0';
   updateHintBtn();
@@ -475,7 +518,7 @@ function renderNumpad(){
 // ════════════════════════════════════════════════
 
 function input(n){
-  if(gameOver || selected===null) return;
+  if(gameOver || selected===null || paused) return;
   if(puzzle[selected]) return;
 
   // ── MODE NOTES : toujours en premier, avant tout ──
@@ -596,6 +639,37 @@ function updateProgress(){
 
 function updateHearts(){
   for(let i=1;i<=3;i++) document.getElementById('h'+i).classList.toggle('lost',i<=errors);
+}
+
+
+// ════════════════════════════════════════════════
+//  PAUSE
+// ════════════════════════════════════════════════
+
+function togglePause(){
+  if(gameOver) return;
+  paused = !paused;
+  const btn  = document.getElementById('pauseBtn');
+  const mask = document.getElementById('pauseMask');
+  const np   = document.getElementById('numpad');
+  const acts = document.querySelectorAll('.act-btn');
+
+  if(paused){
+    clearInterval(timerID);
+    mask.classList.add('show');
+    btn.classList.add('paused');
+    btn.innerHTML = '▶ &nbsp;Resume';
+    // disable numpad and actions
+    np.style.pointerEvents = 'none'; np.style.opacity = '0.3';
+    acts.forEach(b=>{ b.style.pointerEvents='none'; b.style.opacity='0.3'; });
+  } else {
+    timerID = setInterval(()=>{ seconds++; document.getElementById('timer').textContent=fmt(seconds); },1000);
+    mask.classList.remove('show');
+    btn.classList.remove('paused');
+    btn.innerHTML = '⏸ &nbsp;Pause';
+    np.style.pointerEvents = ''; np.style.opacity = '';
+    acts.forEach(b=>{ b.style.pointerEvents=''; b.style.opacity=''; });
+  }
 }
 
 // ════════════════════════════════════════════════
